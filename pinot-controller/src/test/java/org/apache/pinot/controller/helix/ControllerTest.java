@@ -36,19 +36,24 @@ import org.apache.commons.httpclient.methods.multipart.Part;
 import org.apache.commons.httpclient.methods.multipart.StringPart;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.helix.ConfigAccessor;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
+import org.apache.helix.model.ResourceConfig;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.data.DimensionFieldSpec;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.MetricFieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.utils.ZkStarter;
+import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerStarter;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.testng.Assert;
+
+import static org.apache.pinot.common.utils.CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME;
 
 
 /**
@@ -180,6 +185,15 @@ public abstract class ControllerTest {
     String url = _controllerRequestURLBuilder.forSchemaCreate();
     PostMethod postMethod = sendMultipartPostRequest(url, schema.toSingleLineJsonString());
     Assert.assertEquals(postMethod.getStatusCode(), 200);
+  }
+
+  public void enableResourceConfigForLeadControllerResource(boolean enable) {
+    ConfigAccessor configAccessor = _helixManager.getConfigAccessor();
+    ResourceConfig resourceConfig = configAccessor.getResourceConfig(getHelixClusterName(), LEAD_CONTROLLER_RESOURCE_NAME);
+    if (!Boolean.toString(enable).equals(resourceConfig.getSimpleConfig(LeadControllerUtils.RESOURCE_ENABLED))) {
+      resourceConfig.putSimpleConfig(LeadControllerUtils.RESOURCE_ENABLED, Boolean.toString(enable));
+      configAccessor.setResourceConfig(getHelixClusterName(), LEAD_CONTROLLER_RESOURCE_NAME, resourceConfig);
+    }
   }
 
   public static String sendGetRequest(String urlString)

@@ -98,7 +98,8 @@ public class PinotControllerModeTest extends ControllerTest {
     Assert.assertTrue(firstLeadControllerManager.isLeaderForTable(firstTableName));
     Assert.assertTrue(firstLeadControllerManager.isLeaderForTable(secondTableName));
 
-    firstDualModeController.getHelixResourceManager().enableLeadControllerResource(true);
+    _helixManager = helixControllerManager;
+    enableResourceConfigForLeadControllerResource(true);
     TestUtils.waitForCondition(aVoid -> firstLeadControllerManager.isLeadControllerResourceEnabled(), TIMEOUT_IN_MS,
         "Failed to mark lead controller resource as enabled");
     // The first controller should still be the leader for both tables, which is the partition leader, after the resource is enabled.
@@ -122,10 +123,14 @@ public class PinotControllerModeTest extends ControllerTest {
     Assert.assertTrue(secondLeadControllerManager.isLeadControllerResourceEnabled());
 
     // Either one of the controllers is the only leader for a given table name.
-    Assert.assertTrue(firstLeadControllerManager.isLeaderForTable(firstTableName) ^ secondLeadControllerManager
-        .isLeaderForTable(firstTableName));
-    Assert.assertTrue(firstLeadControllerManager.isLeaderForTable(secondTableName) ^ secondLeadControllerManager
-        .isLeaderForTable(secondTableName));
+    TestUtils.waitForCondition(aVoid -> {
+      boolean result;
+      result = firstLeadControllerManager.isLeaderForTable(firstTableName) ^ secondLeadControllerManager
+          .isLeaderForTable(firstTableName);
+      result &= firstLeadControllerManager.isLeaderForTable(secondTableName) ^ secondLeadControllerManager
+          .isLeaderForTable(secondTableName);
+      return result;
+    }, TIMEOUT_IN_MS, "Either one of the controllers is the only leader for a given table");
 
     // Stop the second controller, and there should still be only one MASTER instance for each partition
     secondDualModeController.stop();
@@ -135,7 +140,6 @@ public class PinotControllerModeTest extends ControllerTest {
     firstDualModeController.stop();
 
     // Both controllers are stopped and no one should be the partition leader for tables.
-    Assert.assertTrue(firstLeadControllerManager.isLeadControllerResourceEnabled());
     TestUtils.waitForCondition(aVoid -> {
       boolean result;
       result = !firstLeadControllerManager.isLeaderForTable(firstTableName);
@@ -164,7 +168,8 @@ public class PinotControllerModeTest extends ControllerTest {
     // There should still be only one MASTER instance for each partition
     checkInstanceState(helixAdmin);
 
-    pinotHelixResourceManager.enableLeadControllerResource(false);
+    _helixManager = pinotHelixResourceManager.getHelixZkManager();
+    enableResourceConfigForLeadControllerResource(false);
     final LeadControllerManager thirdLeadControllerManager = pinotHelixResourceManager.getLeadControllerManager();
 
     TestUtils.waitForCondition(aVoid -> !thirdLeadControllerManager.isLeadControllerResourceEnabled(), TIMEOUT_IN_MS,
@@ -204,14 +209,6 @@ public class PinotControllerModeTest extends ControllerTest {
     HelixAdmin helixAdmin = helixControllerManager.getClusterManagmentTool();
     TestUtils.waitForCondition(aVoid -> helixControllerManager.isConnected(), TIMEOUT_IN_MS,
         "Failed to start the Helix-only controller");
-
-    // Enabling the lead controller resource before setting up the Pinot cluster should fail
-    try {
-      _helixResourceManager.enableLeadControllerResource(true);
-      Assert.fail("Enabling the lead controller resource before setting up the Pinot cluster should fail");
-    } catch (Exception e) {
-      // Expected
-    }
 
     // Start the first Pinot-only controller
     firstPinotOnlyController.start();
