@@ -311,7 +311,7 @@ public class PinotSegmentUploadRestletResource {
       // Validate segment
       SegmentValidatorResponse segmentValidatorResponse =
           new SegmentValidator(_pinotHelixResourceManager, _controllerConf, _executor, _connectionManager,
-              _controllerMetrics, _leadControllerManager)
+              _controllerMetrics, _leadControllerManager.isLeaderForTable(offlineTableName))
               .validateSegment(rawTableName, segmentMetadata, tempSegmentDir);
 
       // Zk operations
